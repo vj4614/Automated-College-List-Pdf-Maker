@@ -1,1 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF Report Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .file-drop-zone { border: 2px dashed #cbd5e1; transition: all 0.2s; position: relative; }
+        .file-drop-zone.dragover { background-color: #f0f9ff; border-color: #3b82f6; }
+        .file-drop-zone.uploaded { border-color: #22c55e; background-color: #f0fdf4; }
+        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast {
+            position: fixed; top: 20px; right: 20px; padding: 1rem 1.5rem; border-radius: 0.5rem;
+            color: white; opacity: 0; transform: translateX(100%);
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); z-index: 9999;
+        }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast.error { background-color: #ef4444; }
+        .toast.success { background-color: #22c55e; }
+        .reset-file-btn {
+            position: absolute; top: 0.5rem; right: 0.5rem; background-color: #fee2e2; color: #b91c1c;
+            border-radius: 9999px; width: 1.75rem; height: 1.75rem; display: flex;
+            align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .reset-file-btn:hover { background-color: #fecaca; color: #991b1b; }
+        #config-file-input { display: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
 
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Advanced PDF Report Generator</h1>
+            <p class="mt-2 text-gray-600">High-speed, professional tool for GanitAnk.</p>
+        </header>
+
+        <main>
+            <div id="upload-section" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                 <div class="flex flex-col">
+                    <div id="excel-drop-zone" class="file-drop-zone bg-white p-6 rounded-lg shadow-sm text-center flex flex-col items-center justify-center h-full">
+                        <button id="reset-excel-btn" class="hidden reset-file-btn" title="Remove files"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                        <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls, .csv" multiple>
+                        <div id="excel-icon-initial"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7" /></svg></div>
+                        <div id="excel-icon-success" class="hidden"><svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                        <p class="mt-2 font-semibold text-gray-700">Excel Data File(s)</p>
+                        <p id="excel-file-name" class="text-sm text-gray-500 mt-1 px-2 break-words">Click or drag & drop</p>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <div id="template-drop-zone" class="file-drop-zone bg-white p-6 rounded-lg shadow-sm text-center flex flex-col items-center justify-center h-full">
+                         <button id="reset-template-btn" class="hidden reset-file-btn" title="Remove file"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                        <input type="file" id="template-file-input" class="hidden" accept=".pdf">
+                        <div id="template-icon-initial"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>
+                        <div id="template-icon-success" class="hidden"><svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                        <p class="mt-2 font-semibold text-gray-700">Base Template PDF</p>
+                        <p id="template-file-name" class="text-sm text-gray-500 mt-1 px-2 break-words">Click or drag & drop</p>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <div id="last-page-drop-zone" class="file-drop-zone bg-white p-6 rounded-lg shadow-sm text-center flex flex-col items-center justify-center h-full">
+                        <button id="reset-last-page-btn" class="hidden reset-file-btn" title="Remove file"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                        <input type="file" id="last-page-file-input" class="hidden" accept=".pdf">
+                        <div id="last-page-icon-initial"><svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg></div>
+                        <div id="last-page-icon-success" class="hidden"><svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                        <p class="mt-2 font-semibold text-gray-700">Last Page(s) PDF</p>
+                        <p id="last-page-file-name" class="text-sm text-gray-500 mt-1 px-2 break-words">Click or drag & drop</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+                <details>
+                    <summary class="font-semibold text-gray-700 cursor-pointer">Advanced Options</summary>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                        <div>
+                            <label for="profile-label-col" class="block text-sm font-medium text-gray-600">Profile Label Col</label>
+                            <input type="text" id="profile-label-col" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="profile-value-col" class="block text-sm font-medium text-gray-600">Profile Value Col</label>
+                            <input type="text" id="profile-value-col" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="college-code-col" class="block text-sm font-medium text-gray-600">College Code Col</label>
+                            <input type="text" id="college-code-col" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="college-name-col" class="block text-sm font-medium text-gray-600">College Name Col</label>
+                            <input type="text" id="college-name-col" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="branch-col" class="block text-sm font-medium text-gray-600">Branch Name Col</label>
+                            <input type="text" id="branch-col" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div class="col-span-full">
+                            <label for="filename-template" class="block text-sm font-medium text-gray-600">Filename Template</label>
+                            <input type="text" id="filename-template" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                             <p class="text-xs text-gray-500 mt-1">Use placeholders like {Name}, {Percentile}, etc., based on your profile labels.</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t flex gap-2">
+                        <button id="save-config-btn" class="text-sm bg-gray-600 text-white py-1 px-3 rounded-md hover:bg-gray-700 transition-colors">Save Config</button>
+                        <button id="load-config-btn" class="text-sm bg-gray-200 text-gray-800 py-1 px-3 rounded-md hover:bg-gray-300 transition-colors">Load Config</button>
+                        <input type="file" id="config-file-input" accept=".json">
+                    </div>
+                </details>
+            </div>
+
+            <div class="flex items-center justify-center gap-4">
+                <button id="reset-btn" class="bg-gray-300 text-gray-800 py-3 px-8 rounded-lg hover:bg-gray-400 transition-colors font-semibold">Reset All</button>
+                <button id="generate-btn" class="bg-blue-600 text-white py-3 px-12 rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Generate PDFs</button>
+            </div>
+
+            <div id="progress-section" class="mt-8 hidden">
+                <div class="flex items-center justify-center mb-2"><div class="loader h-8 w-8 rounded-full border-4 border-gray-200"></div><p id="progress-text" class="ml-4 text-lg font-medium text-gray-700">Processing...</p></div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4"><div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div></div>
+                <div id="results-container" class="bg-white rounded-lg p-4 shadow-sm max-h-96 overflow-y-auto"></div>
+                <div class="text-center mt-4 flex gap-4 justify-center">
+                    <button id="cancel-btn" class="hidden w-full md:w-auto bg-red-600 text-white py-3 px-12 rounded-lg hover:bg-red-700 transition-colors text-lg font-semibold">Cancel</button>
+                    <button id="download-zip-btn" class="hidden w-full md:w-auto bg-purple-600 text-white py-3 px-12 rounded-lg hover:bg-purple-700 transition-colors text-lg font-semibold">Download All as ZIP</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div id="toast-container"></div>
+
+    <script id="pdf-worker" type="javascript/worker">
+        // Worker script with font caching for performance
+        self.importScripts(
+            'https://unpkg.com/xlsx/dist/xlsx.full.min.js',
+            'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'
+        );
+        let fontCache = {}; // Cache fonts to avoid re-embedding
+        self.onmessage = async (e) => {
+            const { studentBlock, baseTemplateBuffer, lastPageBuffer, columnMapping, excelFileName, sheetName, filenameTemplate } = e.data;
+            const { PDFDocument, rgb, StandardFonts } = PDFLib;
+            let studentName = 'Unknown';
+            try {
+                const baseTemplateDoc = await PDFDocument.load(baseTemplateBuffer);
+                const lastPageDoc = await PDFDocument.load(lastPageBuffer);
+                const finalPdfDoc = await PDFDocument.create();
+                // Use cached fonts for significant speed improvement
+                if (!fontCache.helvetica) fontCache.helvetica = await finalPdfDoc.embedFont(StandardFonts.Helvetica);
+                if (!fontCache.helveticaBold) fontCache.helveticaBold = await finalPdfDoc.embedFont(StandardFonts.HelveticaBold);
+                const fonts = { helveticaFont: fontCache.helvetica, helveticaBoldFont: fontCache.helveticaBold };
+                const sanitize = (text) => String(text || '').replace(/[\r\n\x00-\x1F\x7F-\x9F]/g, "").trim();
+                const profileRows = studentBlock.slice(0, 8);
+                const collegeRows = studentBlock.slice(9);
+                const profileData = profileRows.map(row => [sanitize(row[columnMapping.profileLabel]), sanitize(row[columnMapping.profileValue])]);
+                studentName = (profileData.find(p => String(p[0]).trim().toLowerCase() === 'name') || [])[1] || 'Unknown';
+                if (studentName === 'Unknown') {
+                    self.postMessage({ type: 'error_student', message: 'Skipping block because student "Name" was not found.', excelFileName, sheetName, studentName });
+                    return;
+                }
+                const collegeList = collegeRows
+                    .filter(row => {
+                        const code = String(row[columnMapping.collegeCode] || '').trim().toUpperCase();
+                        const name = String(row[columnMapping.collegeName] || '').trim();
+                        return code && name && code !== 'CODE' && code !== 'COMMENTS';
+                    })
+                    .map(row => [sanitize(row[columnMapping.collegeCode]), sanitize(row[columnMapping.collegeName]), sanitize(row[columnMapping.branchName])]);
+                const contentPages = await createContentPages(finalPdfDoc, { profileData, collegeList, studentName }, fonts);
+                for (const page of contentPages) {
+                    const [templatePage] = await finalPdfDoc.copyPages(baseTemplateDoc, [0]);
+                    const embeddedPage = await finalPdfDoc.embedPage(page);
+                    templatePage.drawPage(embeddedPage, { x: 0, y: 0, width: templatePage.getWidth(), height: templatePage.getHeight() });
+                    finalPdfDoc.addPage(templatePage);
+                }
+                const lastPagesCopied = await finalPdfDoc.copyPages(lastPageDoc, lastPageDoc.getPageIndices());
+                lastPagesCopied.forEach(page => finalPdfDoc.addPage(page));
+                const pdfBytes = await finalPdfDoc.save();
+                const filename = generateFilename(filenameTemplate, profileData);
+                self.postMessage({ type: 'done_student', filename, bytes: pdfBytes, sheetName, excelFileName });
+            } catch (error) {
+                self.postMessage({ type: 'error_student', message: error.message, excelFileName, sheetName, studentName });
+            }
+        };
+        function generateFilename(template, profileData) {
+            let filename = template;
+            const placeholderMap = {};
+            profileData.forEach(([label, value]) => { if (label) placeholderMap[`{${label}}`] = value.trim(); });
+            for (const placeholder in placeholderMap) {
+                filename = filename.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), placeholderMap[placeholder]);
+            }
+            return filename.replace(/[/\\?%*:|"<>]/g, '-') + '.pdf';
+        }
+    </script>
+    <script>
+        // Inject the full worker functions dynamically
+        const workerScriptElement = document.getElementById('pdf-worker');
+        const fullWorkerFunctionText = `
+            async function createContentPages(doc, data, fonts) {
+                const { PDFDocument, rgb } = PDFLib;
+                const { profileData, collegeList, studentName } = data;
+                const { helveticaFont, helveticaBoldFont } = fonts;
+                let pages = [];
+                let currentDoc = await PDFDocument.create();
+                let currentPage = currentDoc.addPage();
+                const A4_WIDTH = 595.28;
+                const title = \`\${String(studentName).trim()}'s College List\`;
+                currentPage.drawText(title, {
+                    x: (A4_WIDTH - helveticaBoldFont.widthOfTextAtSize(title, 16)) / 2,
+                    y: 710, font: helveticaBoldFont, size: 16, color: rgb(0, 0.168, 0.360)
+                });
+                let y = 670;
+                const profileBoxInfo = drawProfileBox(currentPage, profileData, y, fonts);
+                y = profileBoxInfo.nextY;
+                const col_x = [60, 120, 420, 500, 560];
+                const max_widths = [col_x[1] - col_x[0] - 10, col_x[2] - col_x[1] - 40, col_x[3] - col_x[2] - 10];
+                let prefNo = 1;
+                const drawTableHeader = (page, yPos) => {
+                    const rowHeight = 24;
+                    page.drawRectangle({ x: col_x[0], y: yPos - rowHeight, width: col_x[4] - col_x[0], height: rowHeight, borderColor: rgb(0,0,0), borderWidth: 1});
+                    for (let i = 1; i < 4; i++) { page.drawLine({ start: { x: col_x[i], y: yPos }, end: { x: col_x[i], y: yPos - rowHeight }, thickness: 1, color: rgb(0,0,0) }); }
+                    const headers = ["Code", "College Name", "Branch", "Pref. No."];
+                    headers.forEach((header, i) => {
+                        let headerX = col_x[i] + 4;
+                        if (i === 0) headerX = col_x[0] + (col_x[1] - col_x[0] - helveticaBoldFont.widthOfTextAtSize(headers[0], 11)) / 2;
+                        if (i === 3) headerX = col_x[3] + (col_x[4] - col_x[3] - helveticaBoldFont.widthOfTextAtSize(headers[3], 11)) / 2;
+                        page.drawText(header, { x: headerX, y: yPos - 16, font: helveticaBoldFont, size: 11 });
+                    });
+                    return yPos - rowHeight;
+                };
+                y = drawTableHeader(currentPage, y);
+                for (const college of collegeList) {
+                    const [code, clg, br] = college;
+                    const clgLines = wrapText(clg, max_widths[1], helveticaFont, 10);
+                    const brLines = wrapText(br, max_widths[2], helveticaFont, 10);
+                    const rowHeight = Math.max(clgLines.length, brLines.length) * 14 + 10;
+                    if (y - rowHeight < 80) {
+                        pages.push(currentPage);
+                        currentPage = currentDoc.addPage();
+                        const contdTitle = \`\${title} (Contd.)\`;
+                        currentPage.drawText(contdTitle, { x: (A4_WIDTH - helveticaBoldFont.widthOfTextAtSize(contdTitle, 14)) / 2, y: 710, font: helveticaBoldFont, size: 14 });
+                        y = 690;
+                        y = drawTableHeader(currentPage, y);
+                    }
+                    currentPage.drawRectangle({ x: col_x[0], y: y - rowHeight, width: col_x[4] - col_x[0], height: rowHeight, borderColor: rgb(0,0,0), borderWidth: 1});
+                    for (let i = 1; i < 4; i++) { currentPage.drawLine({ start: { x: col_x[i], y: y }, end: { x: col_x[i], y: y - rowHeight }, thickness: 1, color: rgb(0,0,0) }); }
+                    const codeWidth = helveticaFont.widthOfTextAtSize(String(code), 10);
+                    currentPage.drawText(String(code), { x: col_x[0] + (col_x[1] - col_x[0] - codeWidth) / 2, y: y - 16, font: helveticaFont, size: 10 });
+                    const prefNoWidth = helveticaFont.widthOfTextAtSize(String(prefNo), 10);
+                    currentPage.drawText(String(prefNo), { x: col_x[3] + (col_x[4] - col_x[3] - prefNoWidth) / 2, y: y - 16, font: helveticaFont, size: 10 });
+                    clgLines.forEach((line, i) => currentPage.drawText(line, { x: col_x[1] + 10, y: y - 16 - (i * 14), font: helveticaFont, size: 10 }));
+                    brLines.forEach((line, i) => currentPage.drawText(line, { x: col_x[2] + 10, y: y - 16 - (i * 14), font: helveticaFont, size: 10 }));
+                    y -= rowHeight;
+                    prefNo++;
+                }
+                pages.push(currentPage);
+                return await doc.copyPages(currentDoc, currentDoc.getPageIndices());
+            }
+            function drawProfileBox(page, profileData, yStart, fonts) {
+                const { helveticaFont, helveticaBoldFont } = fonts;
+                const { rgb } = PDFLib;
+                const box_x = 60, box_width = 260, wrap_line_height = 14, label_x = box_x + 10, value_x = box_x + 130, max_value_width = box_x + box_width - value_x - 10;
+                let y = yStart, wrappedRows = [], totalBoxHeight = 0;
+                profileData.forEach(([label, value]) => {
+                    const valueLines = wrapText(value, max_value_width, helveticaFont, 9);
+                    const height = Math.max(1, valueLines.length) * wrap_line_height;
+                    wrappedRows.push({ label, valueLines, height });
+                    totalBoxHeight += height;
+                });
+                page.drawRectangle({ x: box_x, y: y - totalBoxHeight, width: box_width, height: totalBoxHeight, borderColor: rgb(0,0,0), borderWidth: 1 });
+                let current_y = y;
+                wrappedRows.forEach(({ label, valueLines, height }) => {
+                    if (current_y !== y) page.drawLine({ start: { x: box_x, y: current_y }, end: { x: box_x + box_width, y: current_y }, thickness: 1, color: rgb(0,0,0) });
+                    page.drawText(\`\${String(label)}:\`, { x: label_x, y: current_y - 12, font: helveticaBoldFont, size: 9 });
+                    valueLines.forEach((line, i) => page.drawText(line, { x: value_x, y: current_y - 12 - (i * wrap_line_height), font: helveticaFont, size: 9 }));
+                    current_y -= height;
+                });
+                page.drawLine({ start: { x: box_x, y: current_y }, end: { x: box_x + box_width, y: current_y }, thickness: 1, color: rgb(0,0,0) });
+                return { nextY: current_y - 20 };
+            }
+            function wrapText(text, maxWidth, font, fontSize) {
+                if (!text) return [''];
+                const words = String(text).split(' ');
+                let lines = [];
+                let currentLine = '';
+                for (const word of words) {
+                    const testLine = currentLine === '' ? word : \`\${currentLine} \${word}\`;
+                    const width = font.widthOfTextAtSize(testLine, fontSize);
+                    if (width < maxWidth) { currentLine = testLine; } else { lines.push(currentLine); currentLine = word; }
+                }
+                lines.push(currentLine);
+                return lines;
+            }
+        `;
+        // Inject the drawing functions into the main worker script content
+        workerScriptElement.textContent += fullWorkerFunctionText;
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Centralized Configuration ---
+            const CONFIG = {
+                MAX_WORKERS: navigator.hardwareConcurrency || 4,
+                WORKER_TIMEOUT: 30000, // 30 seconds
+                DEFAULT_SETTINGS: {
+                    profileLabelCol: 'A', profileValueCol: 'B', collegeCodeCol: 'A',
+                    collegeNameCol: 'B', branchCol: 'C', filenameTemplate: '{Name} {Percentile}'
+                }
+            };
+            // --- State Variables ---
+            let generatedPdfs = {}; let totalTasks = 0; let completedTasks = 0;
+            const workerPool = []; let taskQueue = [];
+            let baseTemplateBuffer, lastPageBuffer; let isProcessing = false;
+            // --- DOM Element References ---
+            const ui = {
+                fileInputs: {
+                    excel: { files: [], el: document.getElementById('excel-file-input'), zone: document.getElementById('excel-drop-zone'), nameEl: document.getElementById('excel-file-name'), initialIcon: document.getElementById('excel-icon-initial'), successIcon: document.getElementById('excel-icon-success'), resetBtn: document.getElementById('reset-excel-btn') },
+                    template: { file: null, el: document.getElementById('template-file-input'), zone: document.getElementById('template-drop-zone'), nameEl: document.getElementById('template-file-name'), initialIcon: document.getElementById('template-icon-initial'), successIcon: document.getElementById('template-icon-success'), resetBtn: document.getElementById('reset-template-btn') },
+                    lastPage: { file: null, el: document.getElementById('last-page-file-input'), zone: document.getElementById('last-page-drop-zone'), nameEl: document.getElementById('last-page-file-name'), initialIcon: document.getElementById('last-page-icon-initial'), successIcon: document.getElementById('last-page-icon-success'), resetBtn: document.getElementById('reset-last-page-btn') },
+                },
+                generateBtn: document.getElementById('generate-btn'), resetBtn: document.getElementById('reset-btn'),
+                progressSection: document.getElementById('progress-section'), progressText: document.getElementById('progress-text'),
+                progressBar: document.getElementById('progress-bar'), resultsContainer: document.getElementById('results-container'),
+                downloadZipBtn: document.getElementById('download-zip-btn'), cancelBtn: document.getElementById('cancel-btn'),
+                toastContainer: document.getElementById('toast-container'), saveConfigBtn: document.getElementById('save-config-btn'),
+                loadConfigBtn: document.getElementById('load-config-btn'), configFileInput: document.getElementById('config-file-input'),
+                settingsInputs: {
+                    profileLabelCol: document.getElementById('profile-label-col'), profileValueCol: document.getElementById('profile-value-col'),
+                    collegeCodeCol: document.getElementById('college-code-col'), collegeNameCol: document.getElementById('college-name-col'),
+                    branchCol: document.getElementById('branch-col'), filenameTemplate: document.getElementById('filename-template')
+                }
+            };
+            // --- Initialization ---
+            function initializeApp() {
+                Object.keys(ui.fileInputs).forEach(key => setupFileDropZone(key));
+                ui.generateBtn.addEventListener('click', handleGenerateClick);
+                ui.resetBtn.addEventListener('click', () => resetAll(false));
+                ui.cancelBtn.addEventListener('click', () => resetAll(true));
+                ui.downloadZipBtn.addEventListener('click', handleDownloadZip);
+                ui.saveConfigBtn.addEventListener('click', saveConfig);
+                ui.loadConfigBtn.addEventListener('click', () => ui.configFileInput.click());
+                ui.configFileInput.addEventListener('change', loadConfig);
+                applySettings(CONFIG.DEFAULT_SETTINGS); // Load defaults on startup
+            }
+            // --- Main Application Flow ---
+            async function handleGenerateClick() {
+                const settings = getSettings();
+                if (Object.values(settings.columnMapping).some(v => isNaN(v) || v < 0)) {
+                    showToast('Invalid column letter provided in Advanced Options.', 'error'); return;
+                }
+                setupUIForProcessing();
+                try {
+                    await loadPdfTemplates();
+                    await parseExcelFilesAndCreateTasks(settings);
+                    if (taskQueue.length > 0) {
+                        totalTasks = taskQueue.length;
+                        updateProgress();
+                        initializeWorkerPool();
+                        assignTasksToWorkers();
+                    } else {
+                        addErrorResult('No valid student data found to process.');
+                        resetAll(false);
+                    }
+                } catch (error) {
+                    addErrorResult(`A critical error occurred: ${error.message}`);
+                    resetAll(false);
+                }
+            }
+            async function loadPdfTemplates() {
+                addLog('Loading PDF templates...');
+                [baseTemplateBuffer, lastPageBuffer] = await Promise.all([
+                    ui.fileInputs.template.file.arrayBuffer(),
+                    ui.fileInputs.lastPage.file.arrayBuffer()
+                ]);
+                addLog('✅ PDF templates loaded successfully.');
+            }
+            async function parseExcelFilesAndCreateTasks(settings) {
+                for (const excelFile of ui.fileInputs.excel.files) {
+                    addLog(`Parsing Excel file: ${excelFile.name}...`);
+                    try {
+                        const workbook = XLSX.read(await excelFile.arrayBuffer(), { type: 'array' });
+                        for (const sheetName of workbook.SheetNames) {
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                            let studentBlocks = [], currentBlock = [];
+                            for (const row of json) {
+                                if (row[settings.columnMapping.profileLabel] && String(row[settings.columnMapping.profileLabel]).trim().toLowerCase() === "name") {
+                                    if (currentBlock.length > 0) studentBlocks.push(currentBlock);
+                                    currentBlock = [row];
+                                } else if (currentBlock.length > 0) { currentBlock.push(row); }
+                            }
+                            if (currentBlock.length > 0) studentBlocks.push(currentBlock);
+                            addLog(`Found ${studentBlocks.length} student blocks in sheet '${sheetName}'. Queuing tasks...`);
+                            studentBlocks.forEach(block => taskQueue.push({ 
+                                studentBlock: block, columnMapping: settings.columnMapping, filenameTemplate: settings.filenameTemplate,
+                                excelFileName: excelFile.name, sheetName 
+                            }));
+                        }
+                    } catch (error) {
+                        addErrorResult(`Failed to parse ${excelFile.name}: ${error.message}`);
+                    }
+                }
+            }
+            // --- Worker Pool Management ---
+            function initializeWorkerPool() {
+                addLog(`🚀 Initializing a worker pool with ${CONFIG.MAX_WORKERS} workers.`);
+                for (let i = 0; i < CONFIG.MAX_WORKERS; i++) {
+                   initializeSingleWorker(i);
+                }
+            }
+            function initializeSingleWorker(index) {
+                const worker = new Worker(URL.createObjectURL(new Blob([workerScriptElement.textContent], { type: 'application/javascript' })));
+                const handle = { worker, status: 'idle', timeoutId: null };
+                worker.onmessage = (e) => handleWorkerMessage(e, handle);
+                worker.onerror = (e) => handleWorkerError(e, handle);
+                workerPool[index] = handle;
+            }
+            function assignTasksToWorkers() {
+                if (!isProcessing) return;
+                for (const handle of workerPool) {
+                    if (handle.status === 'idle' && taskQueue.length > 0) {
+                        handle.status = 'busy';
+                        const task = taskQueue.shift();
+                        handle.timeoutId = setTimeout(() => {
+                            addErrorResult(`A task from ${task.excelFileName} timed out. Recreating worker and retrying task...`);
+                            handle.worker.terminate();
+                            const index = workerPool.indexOf(handle);
+                            initializeSingleWorker(index);
+                            taskQueue.unshift(task); // Re-queue the failed task
+                            assignTasksToWorkers();
+                        }, CONFIG.WORKER_TIMEOUT);
+                        task.baseTemplateBuffer = baseTemplateBuffer.slice(0);
+                        task.lastPageBuffer = lastPageBuffer.slice(0);
+                        handle.worker.postMessage(task, [task.baseTemplateBuffer, task.lastPageBuffer]);
+                    }
+                }
+            }
+            function handleWorkerMessage(e, workerHandle) {
+                if (!isProcessing) return;
+                clearTimeout(workerHandle.timeoutId);
+                const { type, filename, bytes, sheetName, excelFileName, message, studentName } = e.data;
+                completedTasks++;
+                updateProgress();
+                if (type === 'done_student') {
+                    if (!generatedPdfs[excelFileName]) generatedPdfs[excelFileName] = [];
+                    generatedPdfs[excelFileName].push({ filename, bytes, sheetName });
+                    addResultFile(filename, bytes, excelFileName, sheetName);
+                } else if (type === 'error_student') {
+                    addErrorResult(`Error for '${studentName}' from ${excelFileName} (${sheetName}): ${message}`);
+                }
+                workerHandle.status = 'idle';
+                assignTasksToWorkers();
+                if (completedTasks === totalTasks) { finishProcessing(); }
+            }
+            function handleWorkerError(e, workerHandle) {
+                if (!isProcessing) return;
+                clearTimeout(workerHandle.timeoutId);
+                addErrorResult(`A critical worker error occurred: ${e.message}. The worker will be restarted.`);
+                workerHandle.worker.terminate();
+                const index = workerPool.indexOf(workerHandle);
+                initializeSingleWorker(index);
+                assignTasksToWorkers();
+            }
+            // --- UI and State Management Functions ---
+            function setupUIForProcessing() {
+                isProcessing = true;
+                ui.progressSection.classList.remove('hidden');
+                ui.generateBtn.disabled = true;
+                ui.resetBtn.disabled = true;
+                ui.cancelBtn.classList.remove('hidden');
+                ui.resultsContainer.innerHTML = '';
+                generatedPdfs = {};
+                ui.downloadZipBtn.classList.add('hidden');
+                ui.progressBar.style.width = '0%';
+                totalTasks = 0; completedTasks = 0; taskQueue = [];
+            }
+            function finishProcessing() {
+                addLog('🎉 All PDF Generations Complete!', 'success');
+                ui.progressText.textContent = `Processing Complete: ${completedTasks} / ${totalTasks} successful.`;
+                if (Object.keys(generatedPdfs).length > 0) ui.downloadZipBtn.classList.remove('hidden');
+                ui.resetBtn.disabled = false;
+                ui.cancelBtn.classList.add('hidden');
+                workerPool.forEach(h => h.worker.terminate());
+                workerPool.length = 0;
+                isProcessing = false;
+            }
+            function updateProgress() {
+                ui.progressText.textContent = `Processing: ${completedTasks} / ${totalTasks} PDFs generated.`;
+                const percentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+                ui.progressBar.style.width = `${percentage}%`;
+            }
+            function resetAll(isCancel) {
+                if (isCancel && isProcessing) { addLog('⚠️ Process canceled by user.', 'warn'); }
+                isProcessing = false;
+                workerPool.forEach(h => { if(h.worker) h.worker.terminate(); }); 
+                workerPool.length = 0;
+                Object.keys(ui.fileInputs).forEach(key => resetInput(key));
+                ui.progressSection.classList.add('hidden');
+                ui.resultsContainer.innerHTML = '';
+                ui.progressBar.style.width = '0%';
+                generatedPdfs = {};
+                ui.downloadZipBtn.classList.add('hidden');
+                ui.generateBtn.disabled = true;
+                ui.resetBtn.disabled = false;
+                ui.cancelBtn.classList.add('hidden');
+                totalTasks = 0; completedTasks = 0; taskQueue = [];
+                baseTemplateBuffer = null; lastPageBuffer = null;
+            }
+            function resetInput(key) {
+                const input = ui.fileInputs[key];
+                if (key === 'excel') { input.files = []; } else { input.file = null; }
+                input.el.value = '';
+                input.nameEl.textContent = 'Click or drag & drop';
+                input.zone.classList.remove('uploaded');
+                input.initialIcon.classList.remove('hidden');
+                input.successIcon.classList.add('hidden');
+                input.resetBtn.classList.add('hidden');
+                checkAllFilesUploaded();
+            }
+            function checkAllFilesUploaded() {
+                ui.generateBtn.disabled = !(ui.fileInputs.excel.files.length > 0 && ui.fileInputs.template.file && ui.fileInputs.lastPage.file);
+            }
+            function addLog(message, type = 'info') {
+                const p = document.createElement('p');
+                p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                if (type === 'success') p.className = 'text-green-600';
+                if (type === 'error') p.className = 'text-red-600 font-medium';
+                if (type === 'warn') p.className = 'text-yellow-600';
+                ui.resultsContainer.appendChild(p);
+                ui.resultsContainer.scrollTop = ui.resultsContainer.scrollHeight;
+            }
+            function addErrorResult(errorMessage) {
+                const div = document.createElement('div');
+                div.className = 'flex items-center p-2 border-l-4 border-red-500 bg-red-50';
+                div.innerHTML = `<span class="mr-2 text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg></span><p class="text-sm text-red-800">${errorMessage}</p>`;
+                ui.resultsContainer.appendChild(div);
+                ui.resultsContainer.scrollTop = ui.resultsContainer.scrollHeight;
+            }
+            function addResultFile(filename, bytes, excelFileName, sheetName) {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-2 border-b';
+                div.innerHTML = `<p class="text-sm text-gray-700 truncate mr-2" title="${excelFileName} (${sheetName}) / ${filename}">${excelFileName} (${sheetName}) / ${filename}</p>`;
+                const button = document.createElement('button');
+                button.className = 'flex-shrink-0 text-sm bg-blue-500 text-white py-1 px-3 rounded-md hover:bg-blue-600 transition-colors';
+                button.textContent = 'Download';
+                button.onclick = () => saveAs(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), filename);
+                div.appendChild(button);
+                ui.resultsContainer.appendChild(div);
+            }
+            function handleDownloadZip() {
+                addLog('Creating ZIP file, please wait...');
+                const zip = new JSZip();
+                Object.keys(generatedPdfs).forEach(excelFileName => {
+                    const folderName = excelFileName.replace(/\.xlsx|\.xls|\.csv/i, '');
+                    const folder = zip.folder(folderName);
+                    generatedPdfs[excelFileName].forEach(({ filename, bytes }) => folder.file(filename, bytes));
+                });
+                zip.generateAsync({ type: 'blob' }).then((blob) => {
+                    saveAs(blob, `Ganitank_All_Reports_${new Date().toISOString().slice(0,10)}.zip`);
+                    addLog('✅ ZIP file ready for download.', 'success');
+                });
+            }
+            function showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `toast show ${type}`;
+                toast.textContent = message;
+                ui.toastContainer.appendChild(toast);
+                setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 500); }, 5000);
+            }
+            function setupFileDropZone(key) {
+                const input = ui.fileInputs[key];
+                input.zone.addEventListener('click', () => !isProcessing && input.el.click());
+                input.el.addEventListener('change', (e) => handleFileSelect(key, e.target.files));
+                input.zone.addEventListener('dragover', (e) => { e.preventDefault(); if(!isProcessing) input.zone.classList.add('dragover'); });
+                input.zone.addEventListener('dragleave', () => input.zone.classList.remove('dragover'));
+                input.zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    input.zone.classList.remove('dragover');
+                    if (!isProcessing) handleFileSelect(key, e.dataTransfer.files);
+                });
+                input.resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetInput(key); });
+            }
+            function handleFileSelect(key, files) {
+                if (!files || files.length === 0) return;
+                const input = ui.fileInputs[key];
+                if (key === 'excel') { input.files = Array.from(files); input.nameEl.textContent = `${input.files.length} file(s) selected`; } 
+                else { input.file = files[0]; input.nameEl.textContent = files[0].name; }
+                input.zone.classList.add('uploaded');
+                input.initialIcon.classList.add('hidden');
+                input.successIcon.classList.remove('hidden');
+                input.resetBtn.classList.remove('hidden');
+                checkAllFilesUploaded();
+            }
+            // --- Configuration Management ---
+            function getSettings() {
+                const settings = {};
+                for(const key in ui.settingsInputs) { settings[key] = ui.settingsInputs[key].value; }
+                settings.columnMapping = {
+                    profileLabel: colToIndex(settings.profileLabelCol), profileValue: colToIndex(settings.profileValueCol),
+                    collegeCode: colToIndex(settings.collegeCodeCol), collegeName: colToIndex(settings.collegeNameCol),
+                    branchName: colToIndex(settings.branchCol)
+                };
+                return settings;
+            }
+            function applySettings(settings) {
+                for(const key in settings) { if(ui.settingsInputs[key]) ui.settingsInputs[key].value = settings[key]; }
+            }
+            function saveConfig() {
+                const settings = getSettings();
+                delete settings.columnMapping; // Don't save calculated index
+                saveAs(new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' }), `pdf-generator-config_${new Date().toISOString().slice(0,10)}.json`);
+                showToast('Configuration saved!', 'success');
+            }
+            function loadConfig(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const settings = JSON.parse(e.target.result);
+                        applySettings(settings);
+                        showToast('Configuration loaded successfully!', 'success');
+                    } catch (error) { showToast('Invalid or corrupted configuration file.', 'error'); }
+                };
+                reader.readAsText(file);
+                event.target.value = null; // Allow loading the same file again
+            }
+            function colToIndex(col) { let i=0; for(let j=0;j<col.length;j++){i=i*26+col.toUpperCase().charCodeAt(j)-64;} return i-1; }
+            initializeApp(); // Start the application
+        });
+    </script>
+</body>
+</html>
