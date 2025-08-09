@@ -1,6 +1,6 @@
 # Automated College List PDF Generator
 
-![Project Screenshot](https://raw.githubusercontent.com/vj4614/automated-college-list-pdf-maker/main/creenshot.png)
+![Project Screenshot](https://raw.githubusercontent.com/vj4614/automated-college-list-pdf-maker/main/screenshot.png)
 
 A powerful, browser-based tool designed for **GanitAnk** to automate the creation of personalized college list PDF reports directly from Excel data. This tool is built for efficiency, processing hundreds of student reports in minutes without needing a server.
 
